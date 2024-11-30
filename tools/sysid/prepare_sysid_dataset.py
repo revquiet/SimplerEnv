@@ -29,6 +29,8 @@ if __name__ == "__main__":
     """
     python tools/sysid/prepare_sysid_dataset.py --save-path /home/xuanlin/Downloads/sysid_dataset.pkl --dataset-name fractal20220817_data
     python tools/sysid/prepare_sysid_dataset.py --save-path /home/xuanlin/Downloads/sysid_dataset_bridge.pkl --dataset-name bridge
+
+    python tools/sysid/prepare_sysid_dataset.py --save-path /home/fftai/Downloads/sysid_dataset.pkl --dataset-name fractal20220817_data
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--save-path", type=str, default="/home/xuanlin/Downloads/sysid_dataset.pkl")
@@ -40,6 +42,7 @@ if __name__ == "__main__":
     dset = tfds.builder_from_directory(builder_dir=dataset2path(dataset_name))
 
     dset = dset.as_dataset(split="train", read_config=tfds.ReadConfig(add_tfds_id=True))
+    print(dset)
     dset_iter = iter(dset)
     iter_episode_id = -1
     if dataset_name == "fractal20220817_data":
