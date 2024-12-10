@@ -30,20 +30,18 @@ def demo(fix_root_link, balance_passive_force):
     loader.load_multiple_collisions_from_file = True
 
     robot: sapien.Articulation = loader.load(
-        "ManiSkill2_real2sim/mani_skill2_real2sim/assets/descriptions/grx_description/GR1T2/urdf/GR1T2_jaw.urdf"
+        "ManiSkill2_real2sim/mani_skill2_real2sim/assets/descriptions/grx_description/GR1T2/urdf/GR1T2_fourier_hand_6dof.urdf"
     )
     # robot: sapien.Articulation = loader.load("ManiSkill2_real2sim/mani_skill2_real2sim/assets/descriptions/googlerobot_description/google_robot_meta_sim_fix_wheel_fix_fingertip_recolor_cabinet_visual_matching_1.urdf")
     print(robot.get_links())
     robot.set_root_pose(sapien.Pose([0, 0, 0.98], [1, 0, 0, 0]))
     # Set initial joint positions
-    qpos = [
-        0.,0, 0, 0, 0, 0, 0, 0, 0, 0, 
-        0.,0, 0, 0, 0, 0, 0, 0, 0, 0, 
-        0.,0, 0, 0, 0, 0, 0, 0, 0, 0, 
-        0,0, 0, 0
-        
+    qpos = [ 
+        # 0, 0, 0, -math.pi/2, 0, 0, 0, 1,
+        0.,0, 0, -math.pi/2, 0, 0, 0, -1,
     ]
     robot.set_qpos(qpos)
+    print(robot.get_qpos())
     for joint in robot.get_active_joints():
         joint.set_drive_property(stiffness=1e5, damping=1e3)
 
@@ -73,15 +71,23 @@ def demo(fix_root_link, balance_passive_force):
         # y 轴朝下
         # z 轴朝前方
 
-    tcp_link = [x for x in robot.get_links() if x.name == "torso_link"][0]
+    tcp_link = [x for x in robot.get_links() if x.name == "left_end_effector_link"][0]
+    i =0
     while not viewer.closed:
         # print(robot.get_qpos())
+    #     qpos = [ 
+    #     # 0, 0, 0, -math.pi/2, 0, 0, 0, 1,
+    #     0.,0, 0, -math.sin(0.01*i), 0, 0, 0, -1,
+    # ]
+    #     i+=1
         for _ in range(4):  # render every 4 steps
             if balance_passive_force:
                 qf = robot.compute_passive_force(
                     gravity=True,
                     coriolis_and_centrifugal=True,
+                    external=False
                 )
+                print("qf:-------------",qf)
                 robot.set_qf(qf)
             # print("target qpos", qpos)
             # print("current qpos", robot.get_qpos())
