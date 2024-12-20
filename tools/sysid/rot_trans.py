@@ -33,10 +33,10 @@ def convert_euler_to_rotation_matrix(euler):
 
 def convert_rotation_matrix_to_euler(rotmat):
     """
-    Convert rotation matrix (3x3) to Euler angles (rpy).
+    Convert rotation matrix (3x3) to Euler angles (rpy) deg.
     """
     r = R.from_matrix(rotmat)
-    euler = r.as_euler('xyz', degrees=True)
+    euler = r.as_euler('xyz', degrees=False)
     
     return euler
 
@@ -66,6 +66,11 @@ def cross_product(u, v):
         
 
 def compute_rotation_matrix_from_ortho6d(ortho6d):
+    if ortho6d.ndim == 1:
+        if ortho6d.shape[0] != 6:
+            raise ValueError("Input ortho6d must have 6 elements if it is 1-dimensional.")
+    ortho6d = ortho6d.reshape(1, -1)
+
     x_raw = ortho6d[:, 0:3]
     y_raw = ortho6d[:, 3:6]
         

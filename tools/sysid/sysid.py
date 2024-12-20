@@ -18,7 +18,7 @@ def calc_pose_err_single_ep(episode, arm_stiffness, arm_damping, robot, control_
     import mani_skill2_real2sim.envs
     from sapien.core import Pose
 
-    assert robot in ["google_robot_static", "widowx"]
+    assert robot in ["google_robot_static", "widowx", "grx_robot"]
     if robot == "google_robot_static":
         # append dummy stiffness & damping for the camera links in google robot, which do not affect the results
         arm_stiffness = np.concatenate([arm_stiffness, [2000, 2000]])
@@ -27,6 +27,8 @@ def calc_pose_err_single_ep(episode, arm_stiffness, arm_damping, robot, control_
     if robot == "google_robot_static":
         sim_freq, control_freq = 252, 3
     elif robot == "widowx":
+        sim_freq, control_freq = 500, 5
+    elif robot == "grx_robot":
         sim_freq, control_freq = 500, 5
     env = gym.make(
         "GraspSingleDummy-v0",
@@ -38,9 +40,9 @@ def calc_pose_err_single_ep(episode, arm_stiffness, arm_damping, robot, control_
         max_episode_steps=50,
     )
     # set arm stiffness and damping
-    env.agent.controller.controllers["arm"].config.stiffness = arm_stiffness
-    env.agent.controller.controllers["arm"].config.damping = arm_damping
-    env.agent.controller.controllers["arm"].set_drive_property()
+    env.unwrapped.agent.controller.controllers["arm"].config.stiffness = arm_stiffness
+    env.unwrapped.agent.controller.controllers["arm"].config.damping = arm_damping
+    env.unwrapped.agent.controller.controllers["arm"].set_drive_property()
 
     tcp_poses_at_base = []
     gt_tcp_poses_at_base = []
@@ -85,6 +87,10 @@ def calc_pose_err_single_ep(episode, arm_stiffness, arm_damping, robot, control_
         elif robot == "widowx":
             # the recorded demonstration actions are in the form of raw, pitch, yaw euler angles
             gt_action_rotation_ax, gt_action_rotation_angle = euler2axangle(*gt_action_rotation_delta)
+            gt_action_rotation_axangle = gt_action_rotation_ax * gt_action_rotation_angle
+        elif robot == "grx_robot":
+            # the recorded demonstration actions are in the form of raw, pitch, yaw euler angles
+            gt_action_rotation_ax, gt_action_rotation_angle = euler2axangle(*gt_action_rotation_delta, axes='sxyz')
             gt_action_rotation_axangle = gt_action_rotation_ax * gt_action_rotation_angle
 
         action = np.concatenate(
@@ -148,8 +154,9 @@ def calc_pose_err(dset, arm_stiffness, arm_damping, robot, control_mode, log_pat
     processes = []
 
     # calculate the pose error for each episode in the dataset in parallel
-    pool = mp.Pool(min(len(dset), 18))
+    pool = mp.Pool(min(len(dset), 16))
     for episode in dset:
+        print(episode)
         processes.append(
             pool.apply_async(
                 calc_pose_err_single_ep,
@@ -183,6 +190,8 @@ if __name__ == "__main__":
         --log-path /home/xuanlin/Downloads/opt_results.txt --robot google_robot_static
     python tools/sysid/sysid.py --dataset-path /home/xuanlin/Downloads/sysid_dataset_bridge.pkl \
         --log-path /home/xuanlin/Downloads/opt_results_bridge.txt --robot widowx
+    python tools/sysid/sysid.py --dataset-path /home/fftai/Code/git_repo/SimplerEnv/sysid_log/sysid_dataset.pkl \
+        --log-path /home/fftai/Code/git_repo/SimplerEnv/sysid_log/opt_results.txt --robot grx_robot
     """
 
     os.environ["DISPLAY"] = ""
@@ -234,6 +243,22 @@ if __name__ == "__main__":
         # damping_low = np.array([250, 150, 100, 240, 150, 200])
         # init_stiffness = np.array([1169.7891719504198, 730.0, 808.4601346394447, 1229.1299089624076, 1272.2760456418862, 1056.3326605132252])
         # init_damping = np.array([330.0, 180.0, 152.12036565582588, 309.6215302722146, 201.04998711007383, 269.51458932695414])
+    elif args.robot == "grx_robot":
+        control_mode = "arm_pd_ee_target_delta_pose_align2_gripper_pd_joint_pos"
+        stiffness_high = np.array([2000, 2000, 2000, 2000, 2000, 2000, 2000])
+        stiffness_low = np.array([20, 20, 20, 20, 20, 20, 20])
+        damping_high = np.array([1200, 1200, 1200, 1200, 1200, 1200, 1200])
+        damping_low = np.array([10, 10, 10, 10, 10, 10, 10])
+        init_stiffness = np.array([1000, 1000, 1000, 1000, 1000, 1000, 1000])
+        init_damping = np.array([200, 200, 200, 200, 200, 200, 200])
+
+        # improve param
+        # stiffness_high = np.array([1500, 1000, 1500, 1500, 1200, 1500, 1500])
+        # stiffness_low = np.array([500,     90,  300,   20,  300, 400, 20])
+        # damping_high = np.array([700, 500, 450, 350, 250, 300, 300])
+        # damping_low = np.array([10, 10, 10, 10, 10, 10, 10])
+        # init_stiffness = np.array([1000, 500, 1000, 1000, 1000, 1000, 1000])
+        # init_damping = np.array([300, 300, 300, 200, 100, 150, 150])
     else:
         raise NotImplementedError()
 
