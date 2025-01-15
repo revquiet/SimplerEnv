@@ -30,18 +30,19 @@ def demo(fix_root_link, balance_passive_force):
     loader.load_multiple_collisions_from_file = True
 
     robot: sapien.Articulation = loader.load(
-        "ManiSkill2_real2sim/mani_skill2_real2sim/assets/descriptions/grx_description/GR1T2/urdf/GR1T2_fourier_hand_6dof_no_leg.urdf"
+        "ManiSkill2_real2sim/mani_skill2_real2sim/assets/descriptions/grx_description/GR1T2/urdf/GR1T2_ability_hand_6dof_no_leg.urdf"
     )
     # robot: sapien.Articulation = loader.load("ManiSkill2_real2sim/mani_skill2_real2sim/assets/descriptions/googlerobot_description/google_robot_meta_sim_fix_wheel_fix_fingertip_recolor_cabinet_visual_matching_1.urdf")
     print(robot.get_links())
     robot.set_root_pose(sapien.Pose([0, 0, 0.98], [1, 0, 0, 0]))
     # Set initial joint positions
+    print([joint.name for joint in robot.get_active_joints()])
     qpos = [ 
         0, 0, 0, 0, 0, 0, 0, 
         # 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
         # 0, 1.22, 1.22, 0, 0, 0, 0, 0, 0, 0, 0,
-        -1.74, 0, 0, -1.57, -1.74, -1.57, -1.74, -1.57, -1.74, -1.57, -1.74,
-        # 0, 0, 0, 0, 0, 0, 0, 
+        # -1.74, 0, 0, -1.57, -1.74, -1.57, -1.74, -1.57, -1.74, -1.57, -1.74,
+        -50/180*3.14159, 50/180*3.14159, -50/180*3.14159, 50/180*3.14159, 50/180*3.14159, 50/180*3.14159, 50/180*3.14159, 50/180*3.14159, 50/180*3.14159, 50/180*3.14159, 50/180*3.14159, 
         # 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
     ]
     robot.set_qpos(qpos)
@@ -91,7 +92,7 @@ def demo(fix_root_link, balance_passive_force):
                     coriolis_and_centrifugal=True,
                     external=False
                 )
-                print("qf:-------------",qf)
+                # print("qf:-------------",qf)
                 robot.set_qf(qf)
             # print("target qpos", qpos)
             # print("current qpos", robot.get_qpos())
