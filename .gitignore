@@ -27,3 +27,7 @@ dist/
 .vscode
 
 imgui.ini
+
+octo/
+checkpoints/
+ManiSkill_real2sim/
