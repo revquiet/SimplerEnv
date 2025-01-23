@@ -5,7 +5,6 @@ import sapien.core as sapien
 from sapien.utils.viewer import Viewer
 import math
 
-
 def demo(fix_root_link, balance_passive_force):
     engine = sapien.Engine()
     renderer = sapien.SapienRenderer()
@@ -32,17 +31,27 @@ def demo(fix_root_link, balance_passive_force):
     robot: sapien.Articulation = loader.load(
         "ManiSkill2_real2sim/mani_skill2_real2sim/assets/descriptions/grx_description/GR1T2/urdf/GR1T2_fourier_hand_6dof_no_leg.urdf"
     )
-    # robot: sapien.Articulation = loader.load("ManiSkill2_real2sim/mani_skill2_real2sim/assets/descriptions/googlerobot_description/google_robot_meta_sim_fix_wheel_fix_fingertip_recolor_cabinet_visual_matching_1.urdf")
+    
     print(robot.get_links())
+    robot_joints = robot.get_active_joints()
+    for robot_joint in robot_joints:
+        print(robot_joint.get_name())
+    
+    for joint_idx, joint in enumerate(robot.get_active_joints()):
+        joint.set_drive_property(stiffness=1e5, damping=1e3, force_limit=300,mode='force')
+    
+    time.sleep(5)
+
     robot.set_root_pose(sapien.Pose([0, 0, 0.98], [1, 0, 0, 0]))
     # Set initial joint positions
     qpos = [ 
         0, 0, 0, 0, 0, 0, 0, 
-        # 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
         # 0, 1.22, 1.22, 0, 0, 0, 0, 0, 0, 0, 0,
-        -1.74, 0, 0, -1.57, -1.74, -1.57, -1.74, -1.57, -1.74, -1.57, -1.74,
-        # 0, 0, 0, 0, 0, 0, 0, 
-        # 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+        -1.74, 0, 0,
+        -1.57, -1.74,
+        -1.57, -1.74,
+        -1.57, -1.74,
+        -1.57, -1.74,
     ]
     robot.set_qpos(qpos)
     print(robot.get_qpos())
@@ -60,11 +69,11 @@ def demo(fix_root_link, balance_passive_force):
     camera.set_focal_lengths(605.12, 604.91)
     camera.set_principal_point(424.59, 236.67)
     link_camera = [x for x in robot.get_links() if x.name == "head_yaw_link"][0]
-    camera.set_parent(parent=link_camera, keep_pose=False)
-    camera.set_local_pose(
-        sapien.Pose.from_transformation_matrix(np.array([[np.cos(math.pi/6), 0, np.sin(math.pi/6), 0], [0, 1, 0, 0], [-np.sin(math.pi/6),0,np.cos(math.pi/6), 0], [0, 0, 0, 1]]))
-        # sapien.Pose.from_transformation_matrix(np.array([[0, -1, 0, 0], [0, 0, -1, 0], [1, 0, 0, 0], [0, 0, 0, 1]]))
-    )  # SAPIEN uses ros camera convention; the rotation matrix of link_camera's pose is in opencv convention, so we need to transform it to ros convention
+    # camera.set_parent(parent=link_camera, keep_pose=False)
+    # camera.set_local_pose(
+    #     sapien.Pose.from_transformation_matrix(np.array([[np.cos(math.pi/6), 0, np.sin(math.pi/6), 0], [0, 1, 0, 0], [-np.sin(math.pi/6),0,np.cos(math.pi/6), 0], [0, 0, 0, 1]]))
+    #     # sapien.Pose.from_transformation_matrix(np.array([[0, -1, 0, 0], [0, 0, -1, 0], [1, 0, 0, 0], [0, 0, 0, 1]]))
+    # )  # SAPIEN uses ros camera convention; the rotation matrix of link_camera's pose is in opencv convention, so we need to transform it to ros convention
         # ROS相机规范：ROS 中的相机坐标系通常定义为：
         # x 轴朝向相机的前方
         # y 轴朝左
@@ -79,11 +88,40 @@ def demo(fix_root_link, balance_passive_force):
     i =0
     while not viewer.closed:
         # print(robot.get_qpos())
+        star = 0
+        if math.sin(0.01*i) > 0:
+            star = math.sin(0.01*i)
     #     qpos = [ 
-    #     # 0, 0, 0, -math.pi/2, 0, 0, 0, 1,
-    #     0.,0, 0, -math.sin(0.01*i), 0, 0, 0, -1,
+    #     0. ,0, 0, -math.pi/2, 0, 0, 0, 
+    #     -1.74*star, 
+    #     -1.57*star,
+    #     -1.57*star,
+    #     -1.57*star,
+    #     -1.57*star,
+    #     0, 
+    #     -1.74*star,
+    #     -1.74*star,
+    #     -1.74*star,
+    #     -1.74*star,
+    #     0, 
     # ]
-    #     i+=1
+        qpos = [    
+        0. ,0, 0, -math.pi/2, 0, 0, 0, 
+        -1.74*star,
+        0,
+        0,
+        -1.57*star,
+        -1.74*star,
+        -1.57*star,
+        -1.74*star,
+        -1.57*star,
+        -1.74*star,
+        -1.57*star,
+        -1.74*star,
+    ]
+        i+=1
+        for joint_idx, joint in enumerate(robot.get_active_joints()):
+                joint.set_drive_target(qpos[joint_idx])
         for _ in range(4):  # render every 4 steps
             if balance_passive_force:
                 qf = robot.compute_passive_force(
@@ -96,7 +134,8 @@ def demo(fix_root_link, balance_passive_force):
             # print("target qpos", qpos)
             # print("current qpos", robot.get_qpos())
             # print("tcp pose wrt robot base", robot.pose.inv() * tcp_link.pose)
-            robot.set_drive_target(qpos)
+            # robot.set_qpos(qpos)
+            # robot.set_drive_target(qpos)
             scene.step()
         scene.update_render()
         viewer.render()
@@ -108,25 +147,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    """
-    robot.qpos 13-dim if mobile else 11
-    robot qlimits
-        array([[     -inf,       inf],
-       [     -inf,       inf],
-       [-4.49e+00,  1.35e+00],
-       [-2.66e+00,  3.18e+00],
-       [-2.13e+00,  3.71e+00],
-       [-2.05e+00,  3.79e+00],
-       [-2.92e+00,  2.92e+00],
-       [-1.79e+00,  1.79e+00],
-       [-4.49e+00,  1.35e+00],
-       [-1.00e-04,  1.30e+00], # gripper plus direction = close
-       [-1.00e-04,  1.30e+00],
-       [-3.79e+00,  2.22e+00],
-       [-1.17e+00,  1.17e+00]], dtype=float32)
-    robot.get_active_joints()
-        ['joint_wheel_left', 'joint_wheel_right', 'joint_torso', 'joint_shoulder',
-        'joint_bicep', 'joint_elbow', 'joint_forearm', 'joint_wrist', 'joint_gripper',
-        'joint_finger_right', 'joint_finger_left', 'joint_head_pan', 'joint_head_tilt']
-    If robot is not mobile, then the first two joints are not active
-    """
