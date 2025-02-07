@@ -29,7 +29,7 @@ def demo(fix_root_link, balance_passive_force):
     loader.load_multiple_collisions_from_file = True
 
     robot: sapien.Articulation = loader.load(
-        "ManiSkill2_real2sim/mani_skill2_real2sim/assets/descriptions/grx_description/GR1T2/urdf/GR1T2_fourier_hand_6dof_no_leg.urdf"
+        "ManiSkill2_real2sim/mani_skill2_real2sim/assets/descriptions/grx_description/GR1T2/urdf/GR1T2_fourier_hand_6dof_no_leg_no_collision.urdf"
     )
     
     print(robot.get_links())
@@ -108,8 +108,8 @@ def demo(fix_root_link, balance_passive_force):
         qpos = [    
         0. ,0, 0, -math.pi/2, 0, 0, 0, 
         -1.74*star,
-        0,
-        0,
+        1.22*star,
+        1.22*star,
         -1.57*star,
         -1.74*star,
         -1.57*star,
@@ -127,7 +127,7 @@ def demo(fix_root_link, balance_passive_force):
                 qf = robot.compute_passive_force(
                     gravity=True,
                     coriolis_and_centrifugal=True,
-                    external=False
+                    # external=False
                 )
                 print("qf:-------------",qf)
                 robot.set_qf(qf)
