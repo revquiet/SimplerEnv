@@ -1,0 +1,29 @@
+defaults:
+  # - hand: fourier_dexpilot
+  # - hand: inspire_dexpilot
+  - hand: fourier
+  # - hand: inspire
+  # - hand: fourier_12dof_dexpilot
+  # - hand: fourier_12dof
+
+  - _self_
+
+hand_side: Right
+
+recording:
+  enabled: false
+  task_name: "teleop"
+
+
+hand_filter:
+  min_cutoff: 0.001
+  beta: 50.0
+
+
+preprocessor:
+  hand_type: ${hand.type}
+  named_links: ${robot.named_links}
+
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d_%H-%M-%S}
