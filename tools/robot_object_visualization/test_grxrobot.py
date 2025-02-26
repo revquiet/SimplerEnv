@@ -29,9 +29,18 @@ def demo(fix_root_link, balance_passive_force):
     loader.load_multiple_collisions_from_file = True
 
     robot: sapien.Articulation = loader.load(
-        "ManiSkill2_real2sim/mani_skill2_real2sim/assets/descriptions/grx_description/GR1T2/urdf/GR1T2_fourier_hand_6dof_no_leg_no_collision.urdf"
+        # "ManiSkill2_real2sim/mani_skill2_real2sim/assets/descriptions/grx_description/GR1T2/urdf/GR1T2_fourier_hand_6dof_no_leg_no_collision.urdf"
+                "ManiSkill2_real2sim/mani_skill2_real2sim/assets/descriptions/grx_description/GR1T2/urdf/GR1T2_fourier_hand_6dof_no_leg.urdf"
     )
-    
+
+    # 获取机器人所有的 Link
+    for link in robot.get_links():
+        for visual in link.get_visual_bodies():
+            for render_shape in visual.get_render_shapes():
+                material = render_shape.material
+                material.base_color = np.array([1, 0, 0, 1])  # 变成红色
+    for link in robot.get_links():
+        print(link.get_name())
     print(robot.get_links())
     robot_joints = robot.get_active_joints()
     for robot_joint in robot_joints:
