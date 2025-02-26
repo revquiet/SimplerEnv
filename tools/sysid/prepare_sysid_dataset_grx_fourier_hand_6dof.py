@@ -6,6 +6,8 @@ from rot_trans import conver_ortho6d_to_euler, convert_euler_to_quaternion, comp
 import sapien.core as sapien
 import os
 import pickle
+from omegaconf import OmegaConf, DictConfig
+from simpler_env.utils.hand_retarget.hand import HandRetarget
 
 def calculate_match_index(input_dir, hdf5_file_name):
     frame_ts, _ = load_frame_timestamps(Path(input_dir) / hdf5_file_name / 'top/rgb')
@@ -101,95 +103,57 @@ def load_data(file_path):
         # return np.asarray(f["timestamp"]) - 28800
         return np.asarray(f["action"]["hand"]),np.asarray(f["action"]["pose"]),np.asarray(f["action"]["robot"]), np.asarray(f["state"]["hand"]),np.asarray(f["state"]["pose"]),np.asarray(f["state"]["robot"])
 
+def sapien_input(action_pose,state_hand,state_pose):
+    '''
+    action_pose: [n,24], 9:12是末端右手臂的xyz , 12:18 is 是末端右手臂的姿态, 18:24 is 头的姿态
+    state_hand: [n,12], 0:6 is left_hand, 6:12 is right_hand
+    state_pose: [n,27], 
+    '''
+    action_pose_euler = conver_ortho6d_to_euler(action_pose[i,12:18])
+    # # xyzw
+    action_pose_quaternion = convert_euler_to_quaternion(action_pose_euler)
+    base_pose_tool_reached = sapien.Pose()
+    base_pose_tool_reached.set_p(action_pose[i,9:12])
+    base_pose_tool_reached.set_q(action_pose_quaternion[[3, 0, 1, 2]]) 
 
-def remap(x, old_min, old_max, new_min, new_max, clip=True):
-    old_min = np.array(old_min)
-    old_max = np.array(old_max)
-    new_min = np.array(new_min)
-    new_max = np.array(new_max)
-    x = np.array(x)
-    tmp = (x - old_min) / (old_max - old_min)
-    if clip:
-        tmp = np.clip(tmp, 0, 1)
-    return new_min + tmp * (new_max - new_min)
+    action_world_vector = state_pose[i + 1,9:12] - state_pose[i,9:12]
+    rotation_matrix_before = compute_rotation_matrix_from_ortho6d(state_pose[i + 1,12:18]).squeeze()
+    rotation_matrix_next = compute_rotation_matrix_from_ortho6d(state_pose[i ,12:18]).squeeze().T
+    rotation_diff = np.dot(rotation_matrix_before , rotation_matrix_next)
+    action_rotation_delta = convert_rotation_matrix_to_euler(rotation_diff)
 
-def qpos_to_real(left_qpos, right_qpos):
-    """Convert hand joint angles to real values passed to the hand SDK"""
-    range_max = [10.3, 10.3, 10.3, 10.3, 0.0, 10.3]
-    range_min = [0.0, 0.0, 0.0, 0.0, 10.3, 0.0]
+    # left_action_gripper_6dof,right_action_gripper_6dof = real_to_qpos(state_hand[i,0:6],state_hand[i,6:12])
+    # left_action_gripper_11dof,right_action_gripper_11dof = from_6dof_to_11dof(left_action_gripper_6dof,right_action_gripper_6dof)
+    left_action_gripper_6dof,right_action_gripper_6dof = hand_retarget.real_to_qpos(state_hand[i,0:6],state_hand[i,6:12])
+    left_action_gripper_11dof, right_action_gripper_11dof = hand_retarget.from_6dof_to_11dof(left_action_gripper_6dof,right_action_gripper_6dof)
+    left_action_gripper,right_action_gripper = hand_retarget.hand_to_sapien_11dof(left_action_gripper_11dof,right_action_gripper_11dof)
 
-    left_retargeting_max = [-1.57, -1.57, -1.57, -1.57, 0, -1.74]
-    left_retargeting_min = [0, 0, 0, 0, 1.22, 0]
-    left_qpos_real = remap(
-        left_qpos,
-        left_retargeting_max,
-        left_retargeting_min,
-        range_max,
-        range_min,
-    )
-
-    right_retargeting_max = [-1.57, -1.57, -1.57, -1.57, 0, -1.74]
-    right_retargeting_min = [0, 0, 0, 0, 1.22, 0]
-    right_qpos_real = remap(
-        right_qpos,
-        right_retargeting_max,
-        right_retargeting_min,
-        range_max,
-        range_min,
-    )
-
-    return left_qpos_real, right_qpos_real
-
-def real_to_qpos(left_qpos_real, right_qpos_real):
-    """Convert real values passed to the hand SDK to hand joint angles"""
-    range_max = [10.3, 10.3, 10.3, 10.3, 0.0, 10.3]
-    range_min = [0.0, 0.0, 0.0, 0.0, 10.3, 0.0]
-
-    left_retargeting_max = [-1.57, -1.57, -1.57, -1.57, 0, -1.74]
-    left_retargeting_min = [0, 0, 0, 0, 1.22, 0]
-    left_qpos = remap(
-        left_qpos_real,
-        range_max,
-        range_min,
-        left_retargeting_max,
-        left_retargeting_min,
-    )
-    right_retargeting_max = [-1.57, -1.57, -1.57, -1.57, 0, -1.74]
-    right_retargeting_min = [0, 0, 0, 0, 1.22, 0]
-    right_qpos = remap(
-        right_qpos_real,
-        range_max,
-        range_min,
-        right_retargeting_max,
-        right_retargeting_min,
-    )
-
-    return left_qpos, right_qpos
-
-def from_6dof_to_11dof(left_qpos_6dof, right_qpos_6dof):
-    """Convert 6-DOF hand joint angles to 11-DOF hand joint angles"""
-    left_qpos_6dof_copy = left_qpos_6dof.copy()[[5, 4, 0, 1, 2, 3]]
-    right_qpos_6dof_copy = right_qpos_6dof.copy()[[5, 4, 0, 1, 2, 3]]
-    
-    mimic_coefficients = [0.974, 1.128, 1.131, 1.143, 1.129]
-    mimic_indices = [2, 4, 6, 8, 10]
-    drived_indices = [1, 3, 5, 7, 9]
-
-    left_qpos_11dof = np.zeros(11)
-    left_qpos_11dof[0] = left_qpos_6dof_copy[0]
-    left_qpos_11dof[drived_indices] = left_qpos_6dof_copy[1:]
-    left_qpos_11dof[mimic_indices] = left_qpos_11dof[drived_indices] * mimic_coefficients
-
-    right_qpos_11dof = np.zeros(11)
-    right_qpos_11dof[0] = right_qpos_6dof_copy[0]
-    right_qpos_11dof[drived_indices] = right_qpos_6dof_copy[1:]
-    right_qpos_11dof[mimic_indices] = right_qpos_11dof[drived_indices] * mimic_coefficients
-    
-    return left_qpos_11dof, right_qpos_11dof
+    save_episode_step = {
+                "base_pose_tool_reached": np.concatenate(
+                    [
+                        np.array(base_pose_tool_reached.p, dtype=np.float64),
+                        np.array(base_pose_tool_reached.q, dtype=np.float64),
+                    ]
+                ),  # reached tool pose under the robot base frame, [xyz, quat(wxyz)]
+                "action_world_vector": np.array(action_world_vector, dtype=np.float64),
+                "action_rotation_delta": np.array(action_rotation_delta.squeeze() , dtype=np.float64),
+                'action_gripper': np.concatenate(
+                    [
+                        np.array(left_action_gripper, dtype=np.float64),
+                        np.array(right_action_gripper, dtype=np.float64),
+                    ]
+                ), 
+    }
+    return save_episode_step
 
 
 if __name__=='__main__':
     data_dir = '/mnt/nas/Data/nv-collab-2/012/2024-11-29_11-09-41'
+    cfg = OmegaConf.load("simpler_env/utils/hand_retarget/configs/hand/fourier.yaml")
+    hand_retarget = HandRetarget(cfg)
+    left_landmarks = np.zeros([21,3])
+    right_landmarks = np.zeros([21,3])
+    left_qpos, right_qpos = hand_retarget.retarget(left_landmarks, right_landmarks)
     # episode_name = 'episode_000000003'
     # # matched_ts, timestamp_to_file = calculate_match_index(data_dir, episode_name)
     # frame_ts, timestamp_to_file = load_frame_timestamps(Path(data_dir) / episode_name / 'top/rgb')
@@ -220,8 +184,11 @@ if __name__=='__main__':
             rotation_diff = np.dot(rotation_matrix_before , rotation_matrix_next)
             action_rotation_delta = convert_rotation_matrix_to_euler(rotation_diff)
 
-            left_action_gripper_6dof,right_action_gripper_6dof = real_to_qpos(state_hand[i,0:6],state_hand[i,6:12])
-            left_action_gripper_11dof,right_action_gripper_11dof = from_6dof_to_11dof(left_action_gripper_6dof,right_action_gripper_6dof)
+            # left_action_gripper_6dof,right_action_gripper_6dof = real_to_qpos(state_hand[i,0:6],state_hand[i,6:12])
+            # left_action_gripper_11dof,right_action_gripper_11dof = from_6dof_to_11dof(left_action_gripper_6dof,right_action_gripper_6dof)
+            left_action_gripper_6dof,right_action_gripper_6dof = hand_retarget.real_to_qpos(state_hand[i,0:6],state_hand[i,6:12])
+            left_action_gripper_11dof, right_action_gripper_11dof = hand_retarget.from_6dof_to_11dof(left_action_gripper_6dof,right_action_gripper_6dof)
+            left_action_gripper,right_action_gripper = hand_retarget.hand_to_sapien_11dof(left_action_gripper_11dof,right_action_gripper_11dof)
 
             save_episode_step = {
                         "base_pose_tool_reached": np.concatenate(
@@ -234,14 +201,14 @@ if __name__=='__main__':
                         "action_rotation_delta": np.array(action_rotation_delta.squeeze() , dtype=np.float64),
                         'action_gripper': np.concatenate(
                             [
-                                np.array(left_action_gripper_11dof, dtype=np.float64),
-                                np.array(right_action_gripper_11dof, dtype=np.float64),
+                                np.array(left_action_gripper, dtype=np.float64),
+                                np.array(right_action_gripper, dtype=np.float64),
                             ]
                         ), 
-                    }
+            }
             to_save.append(save_episode_step)
         save.append(to_save)
-    with open("./sysid_log/sysid_dataset_6dof.pkl", "wb") as f:
+    with open("./sysid_log/sysid_dataset_6dof_exp2.pkl", "wb") as f:
         pickle.dump(save, f)
     print("transform done.")
             
